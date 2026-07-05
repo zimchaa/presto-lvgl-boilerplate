@@ -24,11 +24,12 @@
 
 #include "lvgl.h"
 #include "lvgl_port.hpp"
+#include "display_config.hpp"
 
 using namespace pimoroni;
 
-static const uint FRAME_WIDTH  = 240;   // logical; pixel-doubled to 480x480
-static const uint FRAME_HEIGHT = 240;
+static const uint FRAME_WIDTH  = DISPLAY_WIDTH;
+static const uint FRAME_HEIGHT = DISPLAY_HEIGHT;
 
 static const uint BACKLIGHT = 45;
 static const uint LCD_CLK = 26;

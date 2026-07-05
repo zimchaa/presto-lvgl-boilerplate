@@ -11,5 +11,5 @@
 // scanout back buffer.
 void lvgl_port_init(pimoroni::ST7701* presto, pimoroni::PicoGraphics_PenRGB565* front_gfx);
 
-// Latest touch state in 240x240 logical coordinates (for debugging/display).
+// Latest touch state in logical display coordinates (for debugging/display).
 bool lvgl_port_touch_state(uint16_t* x, uint16_t* y);

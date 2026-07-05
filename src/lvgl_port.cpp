@@ -16,11 +16,12 @@
 // pimoroni/presto (modules/py_frozen/touch.py): write register 0x00, read
 // 15 bytes; per-touch record at offset 3+n*6 is
 //   [event|x_hi, x_lo, id|y_hi, y_lo, ...]
-// with coordinates in 480-space (halved here to match the 240x240 canvas).
+// with coordinates in 480-space (scaled here to the logical resolution).
 // The INT line is held low while a touch is active, so we only touch the
 // I2C bus when there is something to read (or a release to notice).
 
 #include "lvgl_port.hpp"
+#include "display_config.hpp"
 
 #include "hardware/i2c.h"
 #include "hardware/gpio.h"
@@ -35,10 +36,9 @@ static uint16_t* s_front = nullptr;
 static uint16_t s_hres = 0, s_vres = 0;
 
 // Two stripe draw buffers so LVGL can render the next stripe while the
-// previous one is being copied. 240x60 px x 2 bytes = 28.8KB each.
-static const uint32_t STRIPE_LINES = 60;
-static lv_color16_t stripe_a[240 * STRIPE_LINES];
-static lv_color16_t stripe_b[240 * STRIPE_LINES];
+// previous one is being copied (sizing in display_config.hpp).
+static lv_color16_t stripe_a[DISPLAY_WIDTH * LVGL_STRIPE_LINES];
+static lv_color16_t stripe_b[DISPLAY_WIDTH * LVGL_STRIPE_LINES];
 
 // ── Display ──────────────────────────────────────────────────────────
 
@@ -107,8 +107,10 @@ static void touch_poll() {
         uint8_t touch_id = d[2] >> 4;
         if (touch_id != 0) continue;       // first finger drives the pointer
         if (event == 0b01 || event == 0b11) continue;
-        s_touch_x = (uint16_t)((((d[0] & 0x0f) << 8) | d[1]) >> 1);  // 480 -> 240
-        s_touch_y = (uint16_t)((((d[2] & 0x0f) << 8) | d[3]) >> 1);
+        uint32_t raw_x = ((d[0] & 0x0f) << 8) | d[1];   // panel 480-space
+        uint32_t raw_y = ((d[2] & 0x0f) << 8) | d[3];
+        s_touch_x = (uint16_t)(raw_x * s_hres / 480);   // -> logical resolution
+        s_touch_y = (uint16_t)(raw_y * s_vres / 480);
         s_touch_down = true;
     }
 }
