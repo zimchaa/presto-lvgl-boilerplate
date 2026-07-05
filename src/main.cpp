@@ -18,6 +18,8 @@
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/clocks.h"
+#include "hardware/psram.h"
+#include "pico/platform/sections.h"
 #include <cstdio>
 
 #include "lvgl.h"
@@ -38,6 +40,23 @@ static uint16_t back_buffer[FRAME_WIDTH * FRAME_HEIGHT];    // scanout (DMA)
 static uint16_t front_buffer[FRAME_WIDTH * FRAME_HEIGHT];   // LVGL composits here
 
 static ST7701* g_presto = nullptr;
+
+// PSRAM (8MB QMI, brought up in runtime init) is memory-mapped; a variable
+// placed there exercises the whole path: linker region, boot init, XIP writes.
+static uint32_t __uninitialized_psram("probe") psram_probe[64];
+
+static void psram_smoke_test() {
+    printf("psram: %u bytes %s\n", (unsigned)psram_get_size(),
+           psram_is_available() ? "available" : "NOT AVAILABLE");
+    for (uint32_t i = 0; i < count_of(psram_probe); i++) psram_probe[i] = i * 0x01010101u;
+    for (uint32_t i = 0; i < count_of(psram_probe); i++) {
+        if (psram_probe[i] != i * 0x01010101u) {
+            printf("psram: readback FAILED at %lu\n", (unsigned long)i);
+            return;
+        }
+    }
+    printf("psram: readback OK (%p)\n", (void*)psram_probe);
+}
 
 static void core1_entry() {
     g_presto->init();                    // display ISRs now live on core 1
@@ -100,6 +119,7 @@ int main() {
 
     printf("\n=== Presto + LVGL boilerplate ===\n");
     printf("sys_clk = %lu Hz\n", (unsigned long)clock_get_hz(clk_sys));
+    psram_smoke_test();
 
     gpio_init(LCD_CS);
     gpio_set_dir(LCD_CS, GPIO_OUT);

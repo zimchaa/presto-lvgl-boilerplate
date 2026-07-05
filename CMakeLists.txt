@@ -9,6 +9,11 @@ set(PICO_BOARD presto)
 set(PICO_NUM_GPIOS 48)
 list(APPEND PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/lib/presto/boards/presto)
 
+# The Presto has 8MB of QMI PSRAM on CS1 (GPIO 47). Setting this before
+# pico_sdk_init() adds the PSRAM region to the linker script, so variables
+# can be placed there with __in_psram / __uninitialized_psram.
+set(PICO_PSRAM_SIZE_BYTES "(8 * 1024 * 1024)")
+
 # ─── Dependencies (submodules under lib/) ────────────────────────────
 set(PICO_SDK_PATH        ${CMAKE_CURRENT_LIST_DIR}/lib/pico-sdk)
 set(PIMORONI_PICO_PATH   ${CMAKE_CURRENT_LIST_DIR}/lib/pimoroni-pico)
@@ -56,6 +61,14 @@ target_link_libraries(${NAME}
     pico_graphics
     hardware_interp
     hardware_i2c
+    hardware_psram
+)
+
+# With CS pin + size defined, hardware_psram's runtime_init hook brings the
+# PSRAM up before main() (and before core1 is launched).
+target_compile_definitions(${NAME} PRIVATE
+    PICO_PSRAM_CS_PIN=47
+    PICO_PSRAM_SIZE_BYTES=8388608
 )
 
 pico_add_extra_outputs(${NAME})       # produces presto-lvgl.uf2
