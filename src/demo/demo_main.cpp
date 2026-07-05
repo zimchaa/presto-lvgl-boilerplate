@@ -111,15 +111,28 @@ int main() {
     multicore_launch_core1(core1_entry);
     multicore_fifo_pop_blocking();
     presto.set_backlight(255);
+    printf("display up\n");
 
     hw_leds_init();
+    printf("leds up\n");
     hw_buzzer_init();
-    bool wifi_ok = hw_wifi_init();        // ~300ms: uploads CYW43 firmware
-    printf("wifi: %s\n", wifi_ok ? "up" : "FAILED");
+    printf("buzzer up\n");
 
     lvgl_port_init(&presto, &gfx);
     build_ui();
     printf("LVGL up\n");
+
+    // Bring the radio up only after the UI has had a moment on screen:
+    // the CYW43 firmware upload takes ~300ms, and if the radio ever
+    // misbehaves we still boot to a usable interface (the WiFi tab just
+    // reports the failure).
+    lv_timer_t* wifi_boot = lv_timer_create([](lv_timer_t*) {
+        printf("wifi: init...\n");
+        bool ok = hw_wifi_init();
+        printf("wifi: %s\n", ok ? "up" : "FAILED");
+        ui_wifi_set_ready(ok);
+    }, 500, nullptr);
+    lv_timer_set_repeat_count(wifi_boot, 1);   // one-shot; LVGL deletes it
 
     while (true) {
         uint32_t wait_ms = lv_timer_handler();

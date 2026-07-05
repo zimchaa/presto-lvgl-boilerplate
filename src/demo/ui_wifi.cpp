@@ -6,6 +6,7 @@
 #include "pico.h"   // count_of
 #include <cstdio>
 
+static lv_obj_t* mac_label;
 static lv_obj_t* status_label;
 static lv_obj_t* scan_btn;
 static lv_obj_t* spinner;
@@ -59,15 +60,10 @@ void ui_wifi_create(lv_obj_t* tab) {
 
     lv_obj_t* card = demo_card(tab, "CYW43439 radio");
 
-    lv_obj_t* mac_label = lv_label_create(card);
-    if (hw_wifi_ready()) {
-        char mac[18];
-        hw_wifi_mac(mac);
-        lv_label_set_text_fmt(mac_label, "MAC  %s", mac);
-    } else {
-        lv_label_set_text(mac_label, "radio init failed");
-        lv_obj_set_style_text_color(mac_label, lv_palette_main(LV_PALETTE_RED), 0);
-    }
+    // The radio is brought up after the first frame (see demo_main.cpp);
+    // ui_wifi_set_ready() fills this in.
+    mac_label = lv_label_create(card);
+    lv_label_set_text(mac_label, "starting radio...");
 
     lv_obj_t* row = lv_obj_create(card);
     lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
@@ -84,14 +80,14 @@ void ui_wifi_create(lv_obj_t* tab) {
     lv_label_set_text(lbl, LV_SYMBOL_REFRESH "  Scan");
     lv_obj_center(lbl);
     lv_obj_add_event_cb(scan_btn, start_scan, LV_EVENT_CLICKED, nullptr);
-    if (!hw_wifi_ready()) lv_obj_add_state(scan_btn, LV_STATE_DISABLED);
+    lv_obj_add_state(scan_btn, LV_STATE_DISABLED);   // until the radio is up
 
     spinner = lv_spinner_create(row);
     lv_obj_set_size(spinner, S(32), S(32));
     lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
 
     status_label = lv_label_create(row);
-    lv_label_set_text(status_label, hw_wifi_ready() ? "ready" : "-");
+    lv_label_set_text(status_label, "-");
     lv_obj_set_style_text_color(status_label, lv_color_hex(0x8a93a6), 0);
 
     list = lv_list_create(tab);
@@ -100,4 +96,18 @@ void ui_wifi_create(lv_obj_t* tab) {
     lv_obj_set_style_bg_color(list, lv_color_hex(0x1e232b), 0);
     lv_obj_set_style_border_width(list, 0, 0);
     lv_obj_set_style_radius(list, S(12), 0);
+}
+
+// Called from demo_main once the (deferred) radio bring-up has finished.
+void ui_wifi_set_ready(bool ok) {
+    if (ok) {
+        char mac[18];
+        hw_wifi_mac(mac);
+        lv_label_set_text_fmt(mac_label, "MAC  %s", mac);
+        lv_label_set_text(status_label, "ready");
+        lv_obj_remove_state(scan_btn, LV_STATE_DISABLED);
+    } else {
+        lv_label_set_text(mac_label, "radio init failed");
+        lv_obj_set_style_text_color(mac_label, lv_palette_main(LV_PALETTE_RED), 0);
+    }
 }

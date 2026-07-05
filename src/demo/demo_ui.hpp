@@ -50,4 +50,5 @@ void ui_sound_create(lv_obj_t* tab);
 void ui_sound_silence();      // kill continuous tones (tab switched away)
 void ui_paint_create(lv_obj_t* tab);
 void ui_wifi_create(lv_obj_t* tab);
+void ui_wifi_set_ready(bool ok);   // radio bring-up finished (demo_main)
 void ui_system_create(lv_obj_t* tab);
