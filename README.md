@@ -3,12 +3,14 @@
 Minimal, commented starting point for running **[LVGL 9](https://lvgl.io)** on
 the **[Pimoroni Presto](https://shop.pimoroni.com/products/presto)** (RP2350B,
 480×480 capacitive touchscreen) with the **pico-sdk in C/C++** — display and
-touch working, entirely from on-chip SRAM, no PSRAM required.
+touch working. Two display modes: 240×240 pixel-doubled (default, entirely
+from on-chip SRAM) or native 480×480 (`-DPRESTO_FULL_RES=ON`, front buffer
+in PSRAM).
 
 Flash it and you get a ~60fps demo UI: a counter button, a spinner, and a
 live touch readout. Delete the demo, keep the port, build your own interface.
 
-## Why 240×240?
+## Why 240×240 by default?
 
 A double-buffered 480×480 RGB565 framebuffer needs 900KB; the RP2350 has 520KB
 of SRAM. But Pimoroni's ST7701 driver has a half-resolution mode where the
@@ -23,6 +25,43 @@ crisp integer scaling. The entire display stack then fits in SRAM:
 | 2 × LVGL stripe draw buffers (240×60)    | 56.3 KB   |
 | LVGL heap (`LV_MEM_SIZE`)                | 48 KB     |
 | **Total**                                | **~330 KB** |
+
+## Full-resolution mode (480×480)
+
+```bash
+cmake -S . -B build-fullres -G Ninja -DCMAKE_BUILD_TYPE=Release -DPRESTO_FULL_RES=ON
+cmake --build build-fullres
+```
+
+`PRESTO_FULL_RES` drives the panel at native 480×480 RGB565 — noticeably
+crisper text and images. Since one 480×480 buffer is 450KB, the memory story
+changes: the Presto's 8MB QMI PSRAM is brought up at boot (pico-sdk
+`hardware_psram`, CS on GPIO 47) and everything that can tolerate PSRAM
+latency moves there:
+
+| Buffer                                | Location | Size    |
+|---------------------------------------|----------|---------|
+| Back buffer (scanout DMA target)      | SRAM     | 450 KB  |
+| Front buffer (LVGL composits here)    | PSRAM    | 450 KB  |
+| 2 × LVGL stripe draw buffers (480×20) | SRAM     | 37.5 KB |
+| LVGL heap (`LV_MEM_POOL_ALLOC` hook)  | PSRAM    | 64 KB   |
+
+The scanout buffer **must** stay in SRAM — the core-1 PIO/DMA scanout can't
+tolerate QMI bus latency — and it consumes nearly all of it: at 24-line
+stripes the link already fails. Only core 0 ever touches PSRAM.
+
+Trade-offs vs. the default mode:
+
+- LVGL software-renders 4× the pixels on the same CPU, so full-screen
+  redraws are proportionally slower; typical partial-update UIs are fine.
+- `presto->update()` copies the 450KB front buffer out of PSRAM each frame
+  (~10ms), which bounds full-frame animation.
+- SRAM headroom for your application's statics is a few KB — put big data
+  in PSRAM (`__uninitialized_psram("yourgroup") type name[...]`), which has
+  ~7MB free.
+
+The mode is selected in `src/display_config.hpp` / `lv_conf.h`; the touch
+driver scales coordinates automatically.
 
 ## Architecture
 
@@ -49,8 +88,8 @@ core 1                              core 0
 - **Touch** is the FT6236 on I²C1, ported from Pimoroni's MicroPython
   `touch.py` and fed to LVGL as a pointer device. Polling is gated on the
   touch controller's INT line, so the I²C bus is only used when a finger is
-  (or just was) on the glass. Coordinates arrive in 480-space and are halved
-  to match the canvas.
+  (or just was) on the glass. Coordinates arrive in 480-space and are scaled
+  to the logical resolution.
 
 ## Building
 
