@@ -10,6 +10,10 @@ in PSRAM).
 Flash it and you get a ~60fps demo UI: a counter button, a spinner, and a
 live touch readout. Delete the demo, keep the port, build your own interface.
 
+Every build also produces a second firmware, **`presto-lvgl-demo.uf2`** — a
+[kitchen-sink demo](#kitchen-sink-demo) that exercises all of the Presto's
+hardware behind a six-tab LVGL interface.
+
 ## Why 240×240 by default?
 
 A double-buffered 480×480 RGB565 framebuffer needs 900KB; the RP2350 has 520KB
@@ -23,8 +27,8 @@ crisp integer scaling. The entire display stack then fits in SRAM:
 | Front buffer (LVGL composits into this)  | 112.5 KB  |
 | Back buffer (scanout DMA target)         | 112.5 KB  |
 | 2 × LVGL stripe draw buffers (240×60)    | 56.3 KB   |
-| LVGL heap (`LV_MEM_SIZE`)                | 48 KB     |
-| **Total**                                | **~330 KB** |
+| LVGL heap (`LV_MEM_SIZE`)                | 64 KB     |
+| **Total**                                | **~345 KB** |
 
 ## Full-resolution mode (480×480)
 
@@ -44,7 +48,7 @@ latency moves there:
 | Back buffer (scanout DMA target)      | SRAM     | 450 KB  |
 | Front buffer (LVGL composits here)    | PSRAM    | 450 KB  |
 | 2 × LVGL stripe draw buffers (480×20) | SRAM     | 37.5 KB |
-| LVGL heap (`LV_MEM_POOL_ALLOC` hook)  | PSRAM    | 64 KB   |
+| LVGL heap (`LV_MEM_POOL_ALLOC` hook)  | PSRAM    | 192 KB  |
 
 The scanout buffer **must** stay in SRAM — the core-1 PIO/DMA scanout can't
 tolerate QMI bus latency — and it consumes nearly all of it: at 24-line
@@ -62,6 +66,38 @@ Trade-offs vs. the default mode:
 
 The mode is selected in `src/display_config.hpp` / `lv_conf.h`; the touch
 driver scales coordinates automatically.
+
+## Kitchen-sink demo
+
+`src/demo/` builds a second target, `presto-lvgl-demo` (both 240×240 and
+full-res trees), that drives every peripheral on the board from a tabbed UI:
+
+| Tab | Hardware | LVGL features shown |
+|-----|----------|---------------------|
+| 🏠 Home | display + touch | round `lv_scale` gauge with an `lv_anim`-driven needle, live scrolling `lv_chart`, the everyday input widgets |
+| 💧 LEDs | the 7 ambient WS2812s (GPIO 33, PIO2 + DMA) | `lv_led` mirror of the strip, effect roller (rainbow/chase/breathe), RGB + brightness sliders |
+| 🔊 Sound | piezo buzzer (PWM, GPIO 43) | a one-octave piano (tone while held), tone generator, and a siren whose frequency is an LVGL animation |
+| ✏️ Paint | FT6236 touch, canvas pixels in PSRAM | `lv_canvas` + draw-layer strokes with round caps, palette, brush size |
+| 📶 WiFi | RM2 / CYW43439 (PIO-SPI, `pico_cyw43_arch_none` — no lwIP) | async scan with results in an `lv_list`, sorted by RSSI |
+| ⚙️ System | RP2350 die-temp ADC, microSD (raw SPI probe: init handshake, CSD/CID, sector-0 read — strictly read-only), backlight PWM, PSRAM, unique ID | live vitals via `lv_timer`, heap bar, cards |
+
+```bash
+./build.sh
+./flash.sh build/presto-lvgl-demo.uf2            # or build-fullres/…
+```
+
+Extra submodule needed for the WiFi driver (once):
+
+```bash
+git -C lib/pico-sdk submodule update --init lib/cyw43-driver
+```
+
+The demo boots the same way as the plain target — core 1 owns the scanout,
+core 0 runs LVGL — and adds: WS2812 on PIO2 (its GPIO base must move to 16
+for pin 33, so it gets a PIO to itself), the CYW43 on whatever PIO/SM the
+SDK picks (PIO0 in practice), and at full res slightly smaller LVGL stripe
+buffers (16 lines instead of 20) so the WiFi driver's static state still
+fits in SRAM.
 
 ## Architecture
 
@@ -106,7 +142,8 @@ Clone with pinned dependencies (pico-sdk, pimoroni-pico, presto, lvgl):
 git clone https://github.com/zimchaa/presto-lvgl-boilerplate
 cd presto-lvgl-boilerplate
 git submodule update --init                          # top-level deps
-git -C lib/pico-sdk submodule update --init lib/tinyusb   # USB serial (printf)
+git -C lib/pico-sdk submodule update --init lib/tinyusb        # USB serial (printf)
+git -C lib/pico-sdk submodule update --init lib/cyw43-driver   # WiFi (demo target)
 ```
 
 Build and flash:

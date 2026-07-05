@@ -34,6 +34,7 @@ static ST7701* s_presto = nullptr;
 static PicoGraphics_PenRGB565* s_gfx = nullptr;
 static uint16_t* s_front = nullptr;
 static uint16_t s_hres = 0, s_vres = 0;
+static uint32_t s_frames = 0;
 
 // Two stripe draw buffers so LVGL can render the next stripe while the
 // previous one is being copied (sizing in display_config.hpp).
@@ -71,8 +72,17 @@ static void flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map)
 
     if (lv_display_flush_is_last(disp)) {
         s_presto->update(s_gfx);
+        s_frames++;
     }
     lv_display_flush_ready(disp);
+}
+
+void lvgl_port_set_backlight(uint8_t brightness) {
+    if (s_presto) s_presto->set_backlight(brightness);
+}
+
+uint32_t lvgl_port_frame_count() {
+    return s_frames;
 }
 
 static uint32_t tick_cb(void) {

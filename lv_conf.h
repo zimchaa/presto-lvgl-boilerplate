@@ -13,8 +13,9 @@
 #if PRESTO_FULL_RES
 
 /* Native 480x480: the scanout buffer eats nearly all of SRAM, so LVGL's
- * heap moves to PSRAM (pool provided by lvgl_port.cpp). */
-#define LV_MEM_SIZE (64 * 1024U)
+ * heap moves to PSRAM (pool provided by lvgl_port.cpp). PSRAM is 8MB, so
+ * size it generously — the kitchen-sink demo builds a six-tab UI. */
+#define LV_MEM_SIZE (192 * 1024U)
 #define LV_MEM_POOL_INCLUDE "lvgl_psram_pool.h"
 #define LV_MEM_POOL_ALLOC lvgl_psram_pool
 
@@ -22,8 +23,9 @@
 
 #else
 
-/* LVGL heap for widgets/styles/draw tasks (RP2350 has 520K SRAM) */
-#define LV_MEM_SIZE (48 * 1024U)
+/* LVGL heap for widgets/styles/draw tasks (RP2350 has 520K SRAM).
+ * 64K leaves room for the kitchen-sink demo's six-tab UI. */
+#define LV_MEM_SIZE (64 * 1024U)
 
 /* 240x240 logical resolution, hardware pixel-doubled to the 480x480 panel */
 #define LV_DPI_DEF 87

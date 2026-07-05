@@ -2,12 +2,17 @@
 # Wait for the Presto to appear as a BOOTSEL mass-storage drive, then copy the
 # firmware onto it. Run this, THEN put the Presto into BOOTSEL mode.
 #
+# Usage: ./flash.sh [path/to/firmware.uf2]
+#   default              build/presto-lvgl.uf2
+#   kitchen-sink demo    ./flash.sh build/presto-lvgl-demo.uf2
+#   full-res variants    ./flash.sh build-fullres/<name>.uf2
+#
 # BOOTSEL: unplug the Presto, hold its BOOT button, plug USB back in, release.
 # It mounts as a drive named RP2350 / RPI-RP2 (contains INFO_UF2.TXT).
 set -euo pipefail
 cd "$(dirname "$0")"
 
-UF2=build/presto-lvgl.uf2
+UF2=${1:-build/presto-lvgl.uf2}
 [ -f "$UF2" ] || { echo "!! $UF2 not found — run ./build.sh first"; exit 1; }
 
 echo ">> Waiting for a BOOTSEL drive (put the Presto into BOOTSEL now)…  Ctrl-C to abort"

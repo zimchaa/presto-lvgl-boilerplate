@@ -13,3 +13,10 @@ void lvgl_port_init(pimoroni::ST7701* presto, pimoroni::PicoGraphics_PenRGB565* 
 
 // Latest touch state in logical display coordinates (for debugging/display).
 bool lvgl_port_touch_state(uint16_t* x, uint16_t* y);
+
+// Panel backlight brightness, 0-255 (PWM on the ST7701 driver).
+void lvgl_port_set_backlight(uint8_t brightness);
+
+// Frames pushed to the panel since boot (counts presto->update() calls);
+// diff over time for an effective frame rate.
+uint32_t lvgl_port_frame_count();

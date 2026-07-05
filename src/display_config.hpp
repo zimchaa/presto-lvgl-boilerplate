@@ -18,7 +18,13 @@ inline constexpr uint16_t DISPLAY_HEIGHT = 480;
 // SRAM is nearly exhausted by the 450KB scanout buffer, so the LVGL stripe
 // buffers shrink: 480x20 px x 2 bytes = 18.75KB each. This is close to the
 // limit — at 24 lines the link fails (heap overlaps the core1 stack).
+// The kitchen-sink demo also carries the CYW43 WiFi driver's static state
+// in SRAM, so it drops to 16 lines to keep a few KB of malloc heap free.
+#if PRESTO_DEMO
+inline constexpr uint32_t LVGL_STRIPE_LINES = 16;
+#else
 inline constexpr uint32_t LVGL_STRIPE_LINES = 20;
+#endif
 
 #else
 
