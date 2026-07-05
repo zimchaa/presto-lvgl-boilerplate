@@ -40,6 +40,19 @@ static uint16_t s_hres = 0, s_vres = 0;
 static lv_color16_t stripe_a[DISPLAY_WIDTH * LVGL_STRIPE_LINES];
 static lv_color16_t stripe_b[DISPLAY_WIDTH * LVGL_STRIPE_LINES];
 
+#if PRESTO_FULL_RES
+// LVGL's heap pool (widgets/styles/draw tasks) sits in PSRAM in full-res
+// builds — SRAM is consumed by the scanout buffer. Hooked in via
+// LV_MEM_POOL_ALLOC in lv_conf.h.
+#include "lvgl_psram_pool.h"
+#include "pico/platform/sections.h"
+static uint8_t __uninitialized_psram("lvgl_pool") lv_pool[LV_MEM_SIZE];
+extern "C" void* lvgl_psram_pool(size_t size) {
+    LV_ASSERT(size <= sizeof(lv_pool));
+    return lv_pool;
+}
+#endif
+
 // ── Display ──────────────────────────────────────────────────────────
 
 static void flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {

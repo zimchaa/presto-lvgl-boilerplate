@@ -21,6 +21,16 @@ set(PIMORONI_PRESTO_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/presto)
 
 set(NAME presto-lvgl)
 
+# ─── Display mode ────────────────────────────────────────────────────
+# OFF (default): 240x240 logical, pixel-doubled in hardware, all in SRAM.
+# ON:  native 480x480 RGB565 — LVGL front buffer and heap live in PSRAM,
+#      the scanout buffer stays in SRAM. See src/display_config.hpp.
+option(PRESTO_FULL_RES "Run the display at native 480x480 instead of 240x240" OFF)
+if (PRESTO_FULL_RES)
+    # Directory-scoped so lv_conf.h sees it when LVGL itself is compiled.
+    add_compile_definitions(PRESTO_FULL_RES=1)
+endif()
+
 include(pimoroni_pico_import.cmake)
 include(pico_sdk_import.cmake)
 
@@ -44,6 +54,8 @@ set(LV_CONF_PATH ${CMAKE_CURRENT_LIST_DIR}/lv_conf.h)
 set(LV_CONF_BUILD_DISABLE_EXAMPLES ON CACHE BOOL "" FORCE)
 set(LV_CONF_BUILD_DISABLE_DEMOS ON CACHE BOOL "" FORCE)
 add_subdirectory(lib/lvgl)
+# For LV_MEM_POOL_INCLUDE ("lvgl_psram_pool.h") in full-res builds.
+target_include_directories(lvgl PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 
 # ─── Application ─────────────────────────────────────────────────────
 add_executable(${NAME}

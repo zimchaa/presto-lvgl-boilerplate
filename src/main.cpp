@@ -6,9 +6,12 @@
 //            core 1, and nothing the application does can starve the panel.
 //   core 0 — LVGL and your application.
 //
-// The panel runs at 240x240 logical resolution; the driver pixel-doubles in
-// hardware to the physical 480x480, which is what lets the whole display
-// stack (two 112.5KB framebuffers + LVGL) fit in on-chip SRAM — no PSRAM.
+// By default the panel runs at 240x240 logical resolution; the driver
+// pixel-doubles in hardware to the physical 480x480, which is what lets the
+// whole display stack (two 112.5KB framebuffers + LVGL) fit in on-chip SRAM.
+// Building with -DPRESTO_FULL_RES=ON drives the panel at native 480x480:
+// the scanout buffer (450KB) fills most of SRAM and the LVGL front buffer
+// and heap move out to the 8MB QMI PSRAM (see display_config.hpp).
 //
 // Demo UI: a counter button, a spinner (so you can see the frame rate), and
 // a live touch-coordinate readout.
@@ -37,8 +40,17 @@ static const uint LCD_CS  = 28;
 static const uint LCD_DAT = 27;
 static const uint LCD_DC  = -1;
 
-static uint16_t back_buffer[FRAME_WIDTH * FRAME_HEIGHT];    // scanout (DMA)
+// The scanout buffer must stay in SRAM: the core1 PIO/DMA scanout cannot
+// tolerate QMI (flash/PSRAM) bus latency without underrunning the panel.
+static uint16_t back_buffer[FRAME_WIDTH * FRAME_HEIGHT];
+#if PRESTO_FULL_RES
+// At 480x480 the RGB565 front buffer (450KB) no longer fits in SRAM beside
+// the scanout buffer, so it lives in PSRAM. Only core 0 touches it: LVGL
+// flushes stripes in, presto->update() beam-races the copy out.
+static uint16_t __uninitialized_psram("framebuffer") front_buffer[FRAME_WIDTH * FRAME_HEIGHT];
+#else
 static uint16_t front_buffer[FRAME_WIDTH * FRAME_HEIGHT];   // LVGL composits here
+#endif
 
 static ST7701* g_presto = nullptr;
 
